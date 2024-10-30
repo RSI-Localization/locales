@@ -2,7 +2,6 @@ name: Locale File Validation
 on:
   pull_request_target:
     branches: [ main ]
-    paths: '**.json'
 
 permissions:
   contents: read
@@ -28,21 +27,58 @@ jobs:
         with:
           node-version: '20'
 
-      # Get changed files using GitHub API
+      # Debug workspace
+      - name: List workspace contents
+        run: |
+          echo "Workspace contents:"
+          ls -la
+          echo "Lang directory contents:"
+          ls -la lang || echo "lang directory not found"
+          echo "Current path:"
+          pwd
+
       - name: Get changed files
         id: changed-files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            const jsonFiles = files
+              .filter(file => 
+                file.status !== 'removed' && 
+                file.filename.endsWith('.json')
+              )
+              .map(file => file.filename);
+            
+            console.log('All changed files:', files.map(f => f.filename));
+            console.log('Filtered JSON files:', jsonFiles);
+            
+            core.setOutput('files', jsonFiles.join('\n'));
+            core.exportVariable('CHANGED_FILES', jsonFiles.join('\n'));
+            
+            // 디버깅을 위한 정보 출력
+            console.log('PR Number:', context.issue.number);
+            console.log('Repository:', context.repo.owner + '/' + context.repo.repo);
+            console.log('Event:', context.eventName);
+
+      - name: Verify files exist
         run: |
-          echo "Fetching origin..."
-          git fetch origin ${{ github.base_ref }}
-          
-          echo "Getting changed files..."
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} ${{ github.sha }} | grep '\.json$' || true)
-          echo "Changed JSON files:"
-          echo "$CHANGED_FILES"
-          
-          # Store in environment variable and output
-          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
-          echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
+          echo "Checking changed files:"
+          for file in $(echo "$CHANGED_FILES" | tr '\n' ' '); do
+            echo "Checking $file"
+            if [ -f "$file" ]; then
+              echo "✓ File exists: $file"
+              echo "File contents:"
+              cat "$file"
+            else
+              echo "✗ File not found: $file"
+            fi
+          done
 
       - name: Create validation script
         run: |
