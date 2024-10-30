@@ -14,12 +14,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      
+          fetch-depth: 0  # Full git history for comparison
+
+      - name: Debug - List files in workspace
+        run: |
+          echo "Current directory contents:"
+          ls -la
+          echo "Git status:"
+          git status
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      # Get changed files using GitHub API
+      - name: Get changed files
+        id: changed-files
+        run: |
+          echo "Fetching origin..."
+          git fetch origin ${{ github.base_ref }}
+          
+          echo "Getting changed files..."
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }} ${{ github.sha }} | grep '\.json$' || true)
+          echo "Changed JSON files:"
+          echo "$CHANGED_FILES"
+          
+          # Store in environment variable and output
+          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
 
       - name: Create validation script
         run: |
@@ -30,6 +53,7 @@ jobs:
           function validateJSON(filePath) {
             const errors = [];
             try {
+              console.log(`Reading file: ${filePath}`);
               const content = fs.readFileSync(filePath, 'utf8');
               let data;
               
@@ -72,6 +96,22 @@ jobs:
                   errors.push('strings must be an object');
                 } else if (Object.keys(data.strings).length === 0) {
                   errors.push('strings object cannot be empty');
+                } else {
+                  // Validate string placeholders
+                  for (const [key, value] of Object.entries(data.strings)) {
+                    if (typeof value !== 'string') {
+                      errors.push(`Value for key "${key}" must be a string`);
+                      continue;
+                    }
+                    
+                    // Check for inconsistent placeholder patterns
+                    const bracketPattern = /\{[^}]+\}/g;
+                    const squareBracketPattern = /\[[^\]]+\]/g;
+                    
+                    if (value.match(bracketPattern) && value.match(squareBracketPattern)) {
+                      errors.push(`Mixed placeholder styles found in "${key}". Use either {placeholder} or [placeholder] style consistently`);
+                    }
+                  }
                 }
               }
               
@@ -82,11 +122,19 @@ jobs:
             }
           }
           
-          const changedFiles = process.env.CHANGED_FILES.split(' ').filter(Boolean);
+          // Get changed files from environment variable
+          const changedFiles = process.env.CHANGED_FILES ? process.env.CHANGED_FILES.split('\n').filter(Boolean) : [];
+          console.log('Changed files to validate:', changedFiles);
+          
           let hasErrors = false;
           const validationResults = [];
           
+          if (changedFiles.length === 0) {
+            console.log('No JSON files to validate');
+          }
+          
           for (const file of changedFiles) {
+            console.log(`Processing file: ${file}`);
             if (file.endsWith('.json')) {
               console.log(`Validating ${file}...`);
               const result = validateJSON(file);
@@ -106,19 +154,16 @@ jobs:
           }
           
           // Save results to JSON file
+          console.log('Validation results:', validationResults);
           fs.writeFileSync('validation-results.json', JSON.stringify(validationResults, null, 2));
           process.exit(hasErrors ? 1 : 0);
           EOF
-
-      - name: Get changed files
-        id: changed-files
-        run: |
-          echo "CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | tr '\n' ' ')" >> $GITHUB_ENV
 
       - name: Validate JSON files
         id: validation
         continue-on-error: true
         run: |
+          echo "Changed files to validate: $CHANGED_FILES"
           node validate-locale.js
           echo "status=$?" >> $GITHUB_OUTPUT
 
@@ -134,7 +179,12 @@ jobs:
               const results = JSON.parse(fs.readFileSync('validation-results.json', 'utf8'));
               
               if (results.length === 0) {
-                comment += 'No JSON files to validate.\n';
+                comment += '⚠️ No JSON files were found in this PR for validation.\n\n';
+                comment += 'This could mean:\n';
+                comment += '- The PR does not contain any JSON file changes\n';
+                comment += '- The files are not in the expected location\n';
+                comment += '- There might be an issue with the file detection\n\n';
+                comment += 'Expected pattern: `**/*.json`\n';
               } else {
                 for (const result of results) {
                   if (result.success) {
@@ -152,6 +202,7 @@ jobs:
               }
             } catch (error) {
               comment += '⚠️ Error occurred while loading validation results.\n';
+              comment += `Error details: ${error.message}\n`;
             }
             
             await github.rest.issues.createComment({
