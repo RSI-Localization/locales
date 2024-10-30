@@ -83,12 +83,10 @@
     "Our Games": "게임",
     "PLAY EARLY ACCESS NOW": "얼리 액세스 지금 플레이",
     "JOIN THE UNIVERSE": "유니버스에 참여하세요",
-    "Make a life among the stars in a limitless multi-player universe": "수많은 사람들과 함께 끝없는 우주를 탐험하세요",
     "PLAY STAR CITIZEN": "스타 시티즌 플레이",
     "LEARN MORE": "더 알아보기",
     "IN DEVELOPMENT": "개발 중",
     "ANSWER THE CALL": "부름에 응답하세요",
-    "Become the hero of a seamless single-player cinematic adventure": "혼자서 즐기는 영화같은 모험의 주인공이 되어보세요",
     "FOLLOW THE DEVELOPMENT": "개발 과정 팔로우",
     "Expand Your Fleet": "함대를 확장하세요",
     "Access the store to discover in-game ships, gear, merchandise and more.": "상점에서 게임 내 함선, 장비, 상품 등을 확인하세요.",
@@ -100,7 +98,6 @@
     "Welcome Hub": "웰컴 허브",
     "Guide System": "가이드 시스템",
     "Seek in-game guidance from experienced players eager to help you master the basics or sharpen your skills.": "기초를 배우고 싶으신가요? 실력을 더 키우고 싶으신가요? 경험 많은 플레이어들이 게임 속에서 여러분을 직접 도와드립니다.",
-    "Support": "지원",
     "Find solutions to commonly encountered issues.": "자주 발생하는 문제에 대한 해결책을 찾아보세요.",
     "Knowledge Base": "지식 데이터베이스",
     "The latest from around the 'verse": "버스의 최신 소식",
@@ -121,7 +118,7 @@
     "Explore Organizations to find a crew that matches your playstyle and interests.": "여러분의 플레이 스타일과 관심사에 맞는 크루를 찾기 위해 조직들을 탐색해보세요.",
     "Report a Bug": "버그 신고",
     "Help us make Star Citizen as good as it can be. Running into in-game problems? Report them to the Issue Council.": "스타 시티즌을 최고로 만들 수 있도록 도와주세요. 게임 내 문제가 발생하셨나요? 이슈 카운슬에 신고해주세요.",
-    "Issue Council": "이슈 카운슬"
+    "Issue Council": "이슈 카운슬",
     "--/Account Sidebar": "--/계정정보 사이드바",
     "Sign Out": "로그아웃",
     "Settings": "설정",
@@ -210,6 +207,6 @@
     "Find a Guide": "가이드 찾기",
     "Seek the guidance of an experienced Star Citizen player to help you master the basics or sharpen your skills.": "숙련된 스타 시티즌 플레이어의 도움을 받아 기본기를 익히고 실력을 향상시켜보세요.",
     "Learn More": "더 알아보기",
-    "Find solutions to the issues you encounter through helpful articles and guides.": "유용한 게시글과 가이드를 통해 문제 해결 방법을 찾아보세요.",
+    "Find solutions to the issues you encounter through helpful articles and guides.": "유용한 게시글과 가이드를 통해 문제 해결 방법을 찾아보세요."
   }
 }
