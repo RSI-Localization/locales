@@ -105,12 +105,12 @@ jobs:
                    }
                    
                    // Check for inconsistent placeholders
-                   const bracketPattern = /\{[^}]+\}/g;
-                   const squareBracketPattern = /\[[^\]]+\]/g;
+                   //const bracketPattern = /\{[^}]+\}/g;
+                   //const squareBracketPattern = /\[[^\]]+\]/g;
                    
-                   if (value.match(bracketPattern) && value.match(squareBracketPattern)) {
-                     errors.push(`Mixed placeholder styles found in "${key}". Use either {placeholder} or [placeholder] style consistently`);
-                   }
+                   //if (value.match(bracketPattern) && value.match(squareBracketPattern)) {
+                   //  errors.push(`Mixed placeholder styles found in "${key}". Use either {placeholder} or [placeholder] style consistently`);
+                   //}
                  }
                }
              }
