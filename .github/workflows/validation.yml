@@ -2,7 +2,7 @@ name: Locale File Validation
 on:
   pull_request_target:
     branches: [ main ]
-    paths: '**.json'
+    paths: 'lang/**.json'
 
 permissions:
   contents: read
