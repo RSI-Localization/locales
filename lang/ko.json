@@ -202,11 +202,17 @@
     "If you pledged for digital items, they will appear in the MY HANGAR section of your account once order fulfillment has completed.": "디지털 아이템을 구매하신 경우, 주문 처리가 완료되면 계정의 '내 격납고'에서 확인하실 수 있습니다.",
     "Latest game releases": "최신 릴리즈 정보",
     "Read all patch notes": "모든 패치노트 읽기",
-    "Learn How to Play": "",
+    "Learn How to Play": "게임 플레이 배우기",
     "Explore a wealth of information ranging from written guides, tutorials, and more!": "가이드, 튜토리얼 등 다양한 정보를 탐색해보세요!",
     "Find a Guide": "가이드 찾기",
     "Seek the guidance of an experienced Star Citizen player to help you master the basics or sharpen your skills.": "숙련된 스타 시티즌 플레이어의 도움을 받아 기본기를 익히고 실력을 향상시켜보세요.",
     "Learn More": "더 알아보기",
-    "Find solutions to the issues you encounter through helpful articles and guides.": "유용한 게시글과 가이드를 통해 문제 해결 방법을 찾아보세요."
+    "Find solutions to the issues you encounter through helpful articles and guides.": "유용한 게시글과 가이드를 통해 문제 해결 방법을 찾아보세요.",
+    "PC Requirements": "PC 요구사양",
+    "Ensure your PC meets the necessary requirements for Star Citizen before proceeding:": "스타 시티즌 실행을 위한 PC 요구사항을 먼저 확인하세요",
+    "Windows 10 - Anniversary Update (64bit)": "윈도우즈 10 - 애니버서리 업데이트 (64bit)",
+    "DirectX 12 Graphics Card with 4GB VRAM": "다이렉트 12를 지원하고 4GB VRAM을 탑재한 그래픽 카드",
+    "Quad Core CPU with AVX instructions (Intel's Sandy Bridge processor and AMD's Bulldozer processor or newer) and 16GB+ RAM": "AVX 명령어를 지원하는 쿼드코어 CPU(인텔 샌디브릿지 프로세서 또는 AMD 불도저 프로세서 이상), 16GB 이상의 Ram",
+    "SSD Required.": "SSD 필수",
   }
 }
