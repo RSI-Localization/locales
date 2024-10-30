@@ -1,254 +1,220 @@
 name: Locale File Validation
 on:
-  pull_request_target:
-    branches: [ main ]
+ pull_request_target:
+   branches: [ main ]
 
 permissions:
-  contents: read
-  pull-requests: write
+ contents: read
+ pull-requests: write
 
 jobs:
-  validate-json:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+ validate-json:
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v4
+       with:
+         ref: ${{ github.event.pull_request.head.sha }}
+         fetch-depth: 0
 
-      - name: Debug - List files in workspace
-        run: |
-          echo "Current directory contents:"
-          ls -la
-          echo "Git status:"
-          git status
+     - name: Set up Node.js
+       uses: actions/setup-node@v4
+       with:
+         node-version: '20'
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+     - name: Get changed files
+       id: changed-files
+       uses: actions/github-script@v7
+       with:
+         script: |
+           const { data: files } = await github.rest.pulls.listFiles({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             pull_number: context.issue.number
+           });
+           
+           const jsonFiles = files
+             .filter(file => 
+               file.status !== 'removed' && 
+               file.filename.endsWith('.json')
+             )
+             .map(file => file.filename);
+           
+           console.log('All changed files:', files.map(f => f.filename));
+           console.log('Filtered JSON files:', jsonFiles);
+           
+           core.setOutput('files', jsonFiles.join('\n'));
+           core.exportVariable('CHANGED_FILES', jsonFiles.join('\n'));
 
-      # Debug workspace
-      - name: List workspace contents
-        run: |
-          echo "Workspace contents:"
-          ls -la
-          echo "Lang directory contents:"
-          ls -la lang || echo "lang directory not found"
-          echo "Current path:"
-          pwd
+     - name: Create validation script
+       run: |
+         cat > validate-locale.js << 'EOF'
+         const fs = require('fs');
+         const path = require('path');
 
-      - name: Get changed files
-        id: changed-files
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            
-            const jsonFiles = files
-              .filter(file => 
-                file.status !== 'removed' && 
-                file.filename.endsWith('.json')
-              )
-              .map(file => file.filename);
-            
-            console.log('All changed files:', files.map(f => f.filename));
-            console.log('Filtered JSON files:', jsonFiles);
-            
-            core.setOutput('files', jsonFiles.join('\n'));
-            core.exportVariable('CHANGED_FILES', jsonFiles.join('\n'));
-            
-            // 디버깅을 위한 정보 출력
-            console.log('PR Number:', context.issue.number);
-            console.log('Repository:', context.repo.owner + '/' + context.repo.repo);
-            console.log('Event:', context.eventName);
+         function validateJSON(filePath) {
+           const errors = [];
+           try {
+             console.log(`Reading file: ${filePath}`);
+             const content = fs.readFileSync(filePath, 'utf8');
+             let data;
+             
+             try {
+               data = JSON.parse(content);
+             } catch (parseError) {
+               errors.push(`JSON syntax error: ${parseError.message}`);
+               return { valid: false, errors };
+             }
+             
+             // Check required fields
+             const requiredFields = ['version', 'lastUpdated', 'metadata', 'strings'];
+             for (const field of requiredFields) {
+               if (!(field in data)) {
+                 errors.push(`Required field "${field}" is missing`);
+               }
+             }
+             
+             // Validate metadata if present
+             if (data.metadata) {
+               const requiredMetadata = ['locale', 'name', 'fallback'];
+               for (const field of requiredMetadata) {
+                 if (!(field in data.metadata)) {
+                   errors.push(`Required metadata field "${field}" is missing`);
+                 }
+               }
+             }
+             
+             // Validate lastUpdated format
+             if (data.lastUpdated) {
+               const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+               if (!dateRegex.test(data.lastUpdated)) {
+                 errors.push('lastUpdated must be in ISO8601 format (YYYY-MM-DDThh:mm:ssZ)');
+               }
+             }
+             
+             // Validate strings
+             if (data.strings) {
+               if (typeof data.strings !== 'object' || Array.isArray(data.strings)) {
+                 errors.push('strings must be an object');
+               } else if (Object.keys(data.strings).length === 0) {
+                 errors.push('strings object cannot be empty');
+               } else {
+                 for (const [key, value] of Object.entries(data.strings)) {
+                   if (typeof value !== 'string') {
+                     errors.push(`Value for key "${key}" must be a string`);
+                     continue;
+                   }
+                   
+                   // Check for inconsistent placeholders
+                   const bracketPattern = /\{[^}]+\}/g;
+                   const squareBracketPattern = /\[[^\]]+\]/g;
+                   
+                   if (value.match(bracketPattern) && value.match(squareBracketPattern)) {
+                     errors.push(`Mixed placeholder styles found in "${key}". Use either {placeholder} or [placeholder] style consistently`);
+                   }
+                 }
+               }
+             }
+             
+             return { valid: errors.length === 0, errors };
+           } catch (error) {
+             errors.push(`File reading error: ${error.message}`);
+             return { valid: false, errors };
+           }
+         }
 
-      - name: Verify files exist
-        run: |
-          echo "Checking changed files:"
-          for file in $(echo "$CHANGED_FILES" | tr '\n' ' '); do
-            echo "Checking $file"
-            if [ -f "$file" ]; then
-              echo "✓ File exists: $file"
-              echo "File contents:"
-              cat "$file"
-            else
-              echo "✗ File not found: $file"
-            fi
-          done
+         const changedFiles = process.env.CHANGED_FILES ? process.env.CHANGED_FILES.split('\n').filter(Boolean) : [];
+         console.log('Changed files to validate:', changedFiles);
 
-      - name: Create validation script
-        run: |
-          cat > validate-locale.js << 'EOF'
-          const fs = require('fs');
-          const path = require('path');
+         let hasErrors = false;
+         const validationResults = [];
 
-          function validateJSON(filePath) {
-            const errors = [];
-            try {
-              console.log(`Reading file: ${filePath}`);
-              const content = fs.readFileSync(filePath, 'utf8');
-              let data;
-              
-              try {
-                data = JSON.parse(content);
-              } catch (parseError) {
-                errors.push(`JSON syntax error: ${parseError.message}`);
-                return { valid: false, errors };
-              }
-              
-              // Check required fields
-              const requiredFields = ['version', 'lastUpdated', 'metadata', 'strings'];
-              for (const field of requiredFields) {
-                if (!(field in data)) {
-                  errors.push(`Required field "${field}" is missing`);
-                }
-              }
-              
-              // Validate metadata if present
-              if (data.metadata) {
-                const requiredMetadata = ['locale', 'name', 'fallback'];
-                for (const field of requiredMetadata) {
-                  if (!(field in data.metadata)) {
-                    errors.push(`Required metadata field "${field}" is missing`);
-                  }
-                }
-              }
-              
-              // Validate lastUpdated format if present
-              if (data.lastUpdated) {
-                const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-                if (!dateRegex.test(data.lastUpdated)) {
-                  errors.push('lastUpdated must be in ISO8601 format (YYYY-MM-DDThh:mm:ssZ)');
-                }
-              }
-              
-              // Validate strings if present
-              if (data.strings) {
-                if (typeof data.strings !== 'object' || Array.isArray(data.strings)) {
-                  errors.push('strings must be an object');
-                } else if (Object.keys(data.strings).length === 0) {
-                  errors.push('strings object cannot be empty');
-                } else {
-                  // Validate string placeholders
-                  for (const [key, value] of Object.entries(data.strings)) {
-                    if (typeof value !== 'string') {
-                      errors.push(`Value for key "${key}" must be a string`);
-                      continue;
-                    }
-                    
-                    // Check for inconsistent placeholder patterns
-                    const bracketPattern = /\{[^}]+\}/g;
-                    const squareBracketPattern = /\[[^\]]+\]/g;
-                    
-                    if (value.match(bracketPattern) && value.match(squareBracketPattern)) {
-                      errors.push(`Mixed placeholder styles found in "${key}". Use either {placeholder} or [placeholder] style consistently`);
-                    }
-                  }
-                }
-              }
-              
-              return { valid: errors.length === 0, errors };
-            } catch (error) {
-              errors.push(`File reading error: ${error.message}`);
-              return { valid: false, errors };
-            }
-          }
-          
-          // Get changed files from environment variable
-          const changedFiles = process.env.CHANGED_FILES ? process.env.CHANGED_FILES.split('\n').filter(Boolean) : [];
-          console.log('Changed files to validate:', changedFiles);
-          
-          let hasErrors = false;
-          const validationResults = [];
-          
-          if (changedFiles.length === 0) {
-            console.log('No JSON files to validate');
-          }
-          
-          for (const file of changedFiles) {
-            console.log(`Processing file: ${file}`);
-            if (file.endsWith('.json')) {
-              console.log(`Validating ${file}...`);
-              const result = validateJSON(file);
-              if (!result.valid) {
-                hasErrors = true;
-                validationResults.push({
-                  file,
-                  errors: result.errors
-                });
-              } else {
-                validationResults.push({
-                  file,
-                  success: true
-                });
-              }
-            }
-          }
-          
-          // Save results to JSON file
-          console.log('Validation results:', validationResults);
-          fs.writeFileSync('validation-results.json', JSON.stringify(validationResults, null, 2));
-          process.exit(hasErrors ? 1 : 0);
-          EOF
+         if (changedFiles.length === 0) {
+           console.log('No JSON files to validate');
+         }
 
-      - name: Validate JSON files
-        id: validation
-        continue-on-error: true
-        run: |
-          echo "Changed files to validate: $CHANGED_FILES"
-          node validate-locale.js
-          echo "status=$?" >> $GITHUB_OUTPUT
+         for (const file of changedFiles) {
+           console.log(`Processing file: ${file}`);
+           if (file.endsWith('.json')) {
+             console.log(`Validating ${file}...`);
+             const result = validateJSON(file);
+             if (!result.valid) {
+               hasErrors = true;
+               validationResults.push({
+                 file,
+                 errors: result.errors
+               });
+             } else {
+               validationResults.push({
+                 file,
+                 success: true
+               });
+             }
+           }
+         }
 
-      - name: Create PR Comment
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let comment = '## JSON Validation Results\n\n';
-            
-            try {
-              const results = JSON.parse(fs.readFileSync('validation-results.json', 'utf8'));
-              
-              if (results.length === 0) {
-                comment += '⚠️ No JSON files were found in this PR for validation.\n\n';
-                comment += 'This could mean:\n';
-                comment += '- The PR does not contain any JSON file changes\n';
-                comment += '- The files are not in the expected location\n';
-                comment += '- There might be an issue with the file detection\n\n';
-                comment += 'Expected pattern: `**/*.json`\n';
-              } else {
-                for (const result of results) {
-                  if (result.success) {
-                    comment += `### ✅ \`${result.file}\`\n`;
-                    comment += 'All validations passed successfully.\n\n';
-                  } else {
-                    comment += `### ❌ \`${result.file}\`\n`;
-                    comment += 'The following issues were found:\n';
-                    result.errors.forEach(error => {
-                      comment += `- ${error}\n`;
-                    });
-                    comment += '\n';
-                  }
-                }
-              }
-            } catch (error) {
-              comment += '⚠️ Error occurred while loading validation results.\n';
-              comment += `Error details: ${error.message}\n`;
-            }
-            
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+         fs.writeFileSync('validation-results.json', JSON.stringify(validationResults, null, 2));
+         process.exit(hasErrors ? 1 : 0);
+         EOF
 
-      - name: Check validation result
-        if: steps.validation.outputs.status != '0'
-        run: exit 1
+     - name: Validate JSON files
+       id: validation
+       run: |
+         echo "Changed files to validate: $CHANGED_FILES"
+         if node validate-locale.js; then
+           echo "status=success" >> $GITHUB_OUTPUT
+         else
+           echo "status=failure" >> $GITHUB_OUTPUT
+           echo "::error::JSON validation failed"
+           exit 1
+         fi
+
+     - name: Create PR Comment
+       if: always()
+       uses: actions/github-script@v7
+       with:
+         script: |
+           const fs = require('fs');
+           let comment = '## JSON Validation Results\n\n';
+           
+           try {
+             const results = JSON.parse(fs.readFileSync('validation-results.json', 'utf8'));
+             
+             if (results.length === 0) {
+               comment += '⚠️ No JSON files were found in this PR for validation.\n\n';
+               comment += 'This could mean:\n';
+               comment += '- The PR does not contain any JSON file changes\n';
+               comment += '- The files are not in the expected location\n';
+               comment += '- There might be an issue with the file detection\n\n';
+               comment += 'Expected pattern: `**/*.json`\n';
+             } else {
+               for (const result of results) {
+                 if (result.success) {
+                   comment += `### ✅ \`${result.file}\`\n`;
+                   comment += 'All validations passed successfully.\n\n';
+                 } else {
+                   comment += `### ❌ \`${result.file}\`\n`;
+                   comment += 'The following issues were found:\n';
+                   result.errors.forEach(error => {
+                     comment += `- ${error}\n`;
+                   });
+                   comment += '\n';
+                 }
+               }
+             }
+           } catch (error) {
+             comment += '⚠️ Error occurred while loading validation results.\n';
+             comment += `Error details: ${error.message}\n`;
+           }
+           
+           await github.rest.issues.createComment({
+             issue_number: context.issue.number,
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             body: comment
+           });
+
+     - name: Check validation result
+       if: steps.validation.outputs.status == 'failure'
+       run: |
+         echo "Validation failed"
+         exit 1
